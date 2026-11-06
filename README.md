@@ -126,7 +126,6 @@ The mapping table is the core asset: `tests/test_mapping.py` checks that convert
 - تاریخچه: `klf history` با جستجو و خروجی CSV
 - جدول نگاشت کلیدها بر اساس استاندارد ISIRI 9147 بررسی شده و تبدیل دوطرفه دقیق است
 
-نسخه جدید پایتونی جایگزین نسخه قدیمی AutoHotkey (فقط ویندوز) شده است؛ نسخه قدیمی در ریپوی قبلی باقی مانده است.
 
 ## License
 
