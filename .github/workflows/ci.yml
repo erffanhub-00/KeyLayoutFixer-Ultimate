@@ -1,0 +1,46 @@
+# CI for KeyLayoutFixer-Ultimate (Python, cross-platform)
+#
+# Runs the pytest suite on Windows, macOS and Linux. The terminal tool
+# and the mapping table are fully covered. The tray icon and global
+# hotkey need a real desktop, so they are NOT tested here: the tray
+# tests only check that the module imports without its optional
+# dependencies and that the tray icon image builds. Manual desktop
+# testing is still required before a release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package with dev and tray extras
+        run: pip install -e ".[dev,tray]"
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: CLI smoke check
+        env:
+          KEYLAYOUTFIXER_DATA_DIR: ${{ runner.temp }}/klf-data
+          KEYLAYOUTFIXER_CONFIG_DIR: ${{ runner.temp }}/klf-config
+        run: |
+          python -m keylayoutfixer --text sghl --no-history
+          printf 'sghl\n' | python -m keylayoutfixer --no-history
