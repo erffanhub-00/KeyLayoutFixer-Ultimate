@@ -43,6 +43,16 @@ def test_default_hotkeys_differ():
 def test_tray_run_fails_clearly_without_dependencies(monkeypatch, tmp_path):
     # run_tray must explain what to install instead of crashing with an
     # ImportError traceback when the tray extras are missing.
+    #
+    # Simulate the missing dependencies even when they ARE installed
+    # (CI installs `.[dev,tray]`, so the old version of this test saw
+    # the real pystray/pynput and went past the import guard: on
+    # headless Linux it died with an Xlib DisplayNameError, and on
+    # Windows/macOS it started the tray event loop and hung until the
+    # 6h job timeout). Setting the sys.modules entries to None makes
+    # the lazy imports inside run_tray() raise ImportError.
+    for name in ("pystray", "pynput", "pyperclip"):
+        monkeypatch.setitem(sys.modules, name, None)
     monkeypatch.setenv("KEYLAYOUTFIXER_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setenv("KEYLAYOUTFIXER_DATA_DIR", str(tmp_path / "data"))
     from keylayoutfixer.tray import run_tray
