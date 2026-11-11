@@ -27,6 +27,10 @@ def run_cli(args, input_text=None, tmp_path=None):
         input=input_text,
         capture_output=True,
         text=True,
+        # The harness always speaks UTF-8 to the child, whatever the
+        # parent's locale is; the child itself must also handle a
+        # non-UTF-8 console (see test_cli_works_when_console_encoding_is_not_utf8).
+        encoding="utf-8",
         env=env,
         timeout=30,
     )
@@ -118,6 +122,20 @@ def test_pipe_mode_multiple_lines(tmp_path):
     result = run_cli([], input_text="sghl\nhello\n", tmp_path=tmp_path)
     assert result.returncode == 0
     assert result.stdout.splitlines() == ["سلام", "اثممخ"]
+
+
+def test_cli_works_when_console_encoding_is_not_utf8(monkeypatch, tmp_path):
+    # Regression test for the Windows CI failures: on Windows the console
+    # code page is cp1252, which cannot encode Persian characters. The CLI
+    # must reconfigure its own streams to UTF-8 instead of crashing with
+    # UnicodeEncodeError when printing سلام (or reading it from a pipe).
+    monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    result = run_cli(["--text", "sghl", "--no-history"], tmp_path=tmp_path)
+    assert result.returncode == 0
+    assert result.stdout.strip() == "سلام"
+    result = run_cli([], input_text="sghl\nسلام\n", tmp_path=tmp_path)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["سلام", "sghl"]
 
 
 def test_version_flag(tmp_path):

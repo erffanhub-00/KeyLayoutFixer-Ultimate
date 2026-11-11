@@ -27,6 +27,22 @@ from .history import History
 DIRECTION_LABEL = {"en": "enToFa", "fa": "faToEn"}
 
 
+def _ensure_utf8_stdio():
+    """Force stdin/stdout/stderr to UTF-8.
+
+    On Windows the console code page is usually cp1252 (or similar), which
+    cannot encode Persian characters at all: printing a conversion result
+    like سلام crashes with UnicodeEncodeError, and reading Persian input
+    from a pipe fails the same way. Reconfiguring the streams up front
+    makes the CLI work on any console, whatever its code page is.
+    """
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def _convert_and_record(text, source="auto", reverse=False, record=True, history=None):
     """Convert one text, optionally recording it. Returns (result, source)."""
     if source == "auto":
@@ -228,6 +244,7 @@ def _run_convert(argv):
 
 def main(argv=None):
     """Entry point for the `klf` / `keylayoutfixer` commands."""
+    _ensure_utf8_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "tray":
         return _run_tray()
