@@ -124,7 +124,8 @@ def test_convert_copies_selection_first(monkeypatch):
 
     assert store["text"] == "سلام"  # converted selection, pasted back
     assert app.last == ("sghl", "سلام")
-    assert ("press", "ctrl") in keys  # Ctrl+C copied, Ctrl+V pasted
+    modifier = "cmd" if sys.platform == "darwin" else "ctrl"
+    assert ("press", modifier) in keys  # copy + paste use the platform modifier
     assert keys.count(("press", "c")) == 1
     assert keys.count(("press", "v")) == 1
 
