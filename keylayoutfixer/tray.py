@@ -20,11 +20,19 @@ Honest limits (also in the README):
   desktop. It must be tested by hand on Windows/macOS/Linux.
 """
 
+import sys
 import time
 
 from .config import load_config
 from .convert import convert_text
 from .history import History
+
+
+def _modifier_key():
+    """Copy/paste modifier: Cmd on macOS, Ctrl everywhere else."""
+    from pynput.keyboard import Key
+
+    return Key.cmd if sys.platform == "darwin" else Key.ctrl
 
 
 def create_icon_image():
@@ -59,27 +67,62 @@ class TrayApp:
             else None
         )
 
-    def _paste(self):
-        """Simulate Ctrl+V with pynput (imported lazily)."""
-        from pynput.keyboard import Controller, Key
+    def _press_copy(self):
+        """Simulate Ctrl+C (Cmd+C on macOS) to copy the current selection."""
+        from pynput.keyboard import Controller
 
         keyboard = Controller()
-        keyboard.press(Key.ctrl)
+        modifier = _modifier_key()
+        keyboard.press(modifier)
+        keyboard.press("c")
+        keyboard.release("c")
+        keyboard.release(modifier)
+
+    def _paste(self):
+        """Simulate Ctrl+V (Cmd+V on macOS) with pynput (imported lazily)."""
+        from pynput.keyboard import Controller
+
+        keyboard = Controller()
+        modifier = _modifier_key()
+        keyboard.press(modifier)
         keyboard.press("v")
         keyboard.release("v")
-        keyboard.release(Key.ctrl)
+        keyboard.release(modifier)
 
     def convert_clipboard(self):
-        """Convert the clipboard text and paste it over the selection."""
+        """Copy the current selection, convert it, paste it back over it.
+
+        The selection must be copied first: without this step the hotkey
+        would convert whatever stale text happens to be in the clipboard,
+        not the text the user just selected. The clipboard is cleared
+        before copying so an empty selection is detectable (nothing new
+        copied) and the previous content can be restored.
+        """
         if self.paused:
             return
         import pyperclip
 
         try:
+            previous = pyperclip.paste()
+        except Exception:
+            previous = ""
+        try:
+            pyperclip.copy("")
+        except Exception:
+            return
+        try:
+            self._press_copy()
+        except Exception:
+            self._restore_clipboard(previous)
+            return
+        time.sleep(0.15)
+        try:
             text = pyperclip.paste()
         except Exception:
             return
         if not text or not text.strip():
+            # Nothing selected: put the clipboard back as it was.
+            self._restore_clipboard(previous)
             return
         converted = convert_text(text)
         if converted == text:
@@ -97,6 +140,15 @@ class TrayApp:
 
             source = detect_source(text)
             self.history.add(text, converted, "enToFa" if source == "en" else "faToEn")
+
+    @staticmethod
+    def _restore_clipboard(text):
+        import pyperclip
+
+        try:
+            pyperclip.copy(text)
+        except Exception:
+            pass
 
     def undo_last(self):
         """Restore the original text, but only if the clipboard still

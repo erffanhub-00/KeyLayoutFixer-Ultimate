@@ -59,3 +59,95 @@ def test_tray_run_fails_clearly_without_dependencies(monkeypatch, tmp_path):
 
     with pytest.raises(RuntimeError, match="keylayoutfixer\\[tray\\]"):
         run_tray()
+
+
+def _fake_clipboard(monkeypatch, selection):
+    """Fake pyperclip + pynput.keyboard for TrayApp tests (no desktop).
+
+    The fake clipboard starts with stale text. Pressing Ctrl+C through
+    the fake Controller copies ``selection`` into it, the way a real
+    app copies the user's selected text; with no selection the
+    clipboard stays as cleared.
+    """
+    import types
+
+    store = {"text": "stale clipboard"}
+    selection_box = {"text": selection}
+
+    pyperclip = types.ModuleType("pyperclip")
+    pyperclip.paste = lambda: store["text"]
+    pyperclip.copy = lambda text: store.__setitem__("text", text)
+    monkeypatch.setitem(sys.modules, "pyperclip", pyperclip)
+
+    keys_pressed = []
+
+    class Key:
+        ctrl = "ctrl"
+        cmd = "cmd"
+
+    class Controller:
+        def __init__(self):
+            self.held = set()
+
+        def press(self, key):
+            keys_pressed.append(("press", key))
+            self.held.add(key)
+            if key == "c" and ("ctrl" in self.held or "cmd" in self.held):
+                store["text"] = selection_box["text"]
+
+        def release(self, key):
+            keys_pressed.append(("release", key))
+            self.held.discard(key)
+
+    keyboard = types.ModuleType("pynput.keyboard")
+    keyboard.Controller = Controller
+    keyboard.Key = Key
+    pynput = types.ModuleType("pynput")
+    pynput.keyboard = keyboard
+    monkeypatch.setitem(sys.modules, "pynput", pynput)
+    monkeypatch.setitem(sys.modules, "pynput.keyboard", keyboard)
+    return store, keys_pressed
+
+
+def test_convert_copies_selection_first(monkeypatch):
+    """Regression test: the hotkey must copy the current selection.
+
+    The original code converted whatever stale text was already in the
+    clipboard, so pressing the hotkey on a fresh selection did nothing
+    useful (or converted the wrong text).
+    """
+    from keylayoutfixer.tray import TrayApp
+
+    store, keys = _fake_clipboard(monkeypatch, selection="sghl")
+    app = TrayApp({"keep_history": False, "max_history": 200})
+    app.convert_clipboard()
+
+    assert store["text"] == "سلام"  # converted selection, pasted back
+    assert app.last == ("sghl", "سلام")
+    assert ("press", "ctrl") in keys  # Ctrl+C copied, Ctrl+V pasted
+    assert keys.count(("press", "c")) == 1
+    assert keys.count(("press", "v")) == 1
+
+
+def test_convert_with_no_selection_restores_clipboard(monkeypatch):
+    from keylayoutfixer.tray import TrayApp
+
+    store, _keys = _fake_clipboard(monkeypatch, selection="")
+    app = TrayApp({"keep_history": False, "max_history": 200})
+    app.convert_clipboard()
+
+    assert store["text"] == "stale clipboard"
+    assert app.last is None
+
+
+def test_copy_paste_use_cmd_on_macos(monkeypatch):
+    from keylayoutfixer.tray import TrayApp
+
+    store, keys = _fake_clipboard(monkeypatch, selection="sghl")
+    monkeypatch.setattr(sys, "platform", "darwin")
+    app = TrayApp({"keep_history": False, "max_history": 200})
+    app.convert_clipboard()
+
+    assert ("press", "cmd") in keys
+    assert ("press", "ctrl") not in keys
+    assert store["text"] == "سلام"

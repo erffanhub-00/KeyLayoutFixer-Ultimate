@@ -22,6 +22,14 @@ original repository under `terminal88project`).
 - pytest suite: mapping round-trip for every mappable character,
   direction detection, CLI pipe mode, history storage, settings.
 
+### Fixed (tray, before the v1.0.0 release)
+
+- The convert hotkey (`Ctrl+Shift+K`) now copies the current selection
+  first (Ctrl+C, Cmd+C on macOS) instead of converting whatever stale
+  text was already in the clipboard. With no selection the clipboard
+  is restored untouched. Paste also uses Cmd+V on macOS (it was
+  Ctrl+V on every platform).
+
 ### Fixed (mapping table, verified against ISIRI 9147)
 
 The old AHK table was missing 32 mappings and had one wrong entry,
