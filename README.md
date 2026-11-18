@@ -117,6 +117,17 @@ python -m pytest -q
 
 The mapping table is the core asset: `tests/test_mapping.py` checks that converting twice returns the original text for every mappable character. Any change to `mapping.py` must cite ISIRI 9147 and keep those tests green. Tray tests skip gracefully without a desktop; the hotkey and tray icon need manual testing on a real machine.
 
+### Standalone binary
+
+`klf.py` is the PyInstaller entry point (the package `__main__.py` cannot be used directly — it uses a relative import):
+
+```bash
+pip install -e ".[tray]" pyinstaller
+pyinstaller --onefile --name klf --collect-all pystray --collect-all pynput klf.py
+```
+
+That produces a single-file `klf` binary (tray mode included) in `dist/`. The same command runs on the Windows runner in `.github/workflows/release.yml` to build the Windows `.exe` for a release.
+
 ## فارسی | Persian
 
 ابزار تبدیل چیدمان کیبورد فارسی و انگلیسی — ترمینال‌محور و کراس‌پلتفرم (ویندوز، مک، لینوکس). اگر با چیدمان اشتباه تایپ کردی، متن را برمی‌گرداند: `sghl` می‌شود `سلام` و برعکس.
