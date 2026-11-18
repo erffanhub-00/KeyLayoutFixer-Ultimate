@@ -187,6 +187,15 @@ def run_tray(config=None):
             "tray mode needs pystray, pynput and pyperclip: "
             'pip install "keylayoutfixer[tray]"'
         ) from exc
+    except Exception as exc:
+        # Importing the tray backends can fail for other reasons too:
+        # on Linux pystray connects to the X display at import time,
+        # so a missing DISPLAY raises DisplayNameError, not
+        # ImportError. Report it clearly instead of a traceback.
+        raise RuntimeError(
+            "tray mode cannot start here "
+            f"(no desktop/display available: {exc})"
+        ) from exc
 
     app = TrayApp(config)
 

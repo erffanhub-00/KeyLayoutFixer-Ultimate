@@ -29,6 +29,9 @@ original repository under `terminal88project`).
   text was already in the clipboard. With no selection the clipboard
   is restored untouched. Paste also uses Cmd+V on macOS (it was
   Ctrl+V on every platform).
+- `klf tray` now reports a clear error when no desktop/display is
+  available instead of a traceback (on Linux pystray connects to the
+  display at import time).
 
 ### Fixed (mapping table, verified against ISIRI 9147)
 

@@ -151,3 +151,25 @@ def test_copy_paste_use_cmd_on_macos(monkeypatch):
     assert ("press", "cmd") in keys
     assert ("press", "ctrl") not in keys
     assert store["text"] == "سلام"
+
+
+def test_tray_run_fails_clearly_when_display_missing(monkeypatch, tmp_path):
+    """pystray connects to the X display at import time on Linux, so a
+    missing DISPLAY raises DisplayNameError (not ImportError): run_tray
+    must still report a clear error instead of a traceback."""
+    monkeypatch.delitem(sys.modules, "pystray", raising=False)
+
+    class _FailingFinder:
+        def find_spec(self, name, path, target=None):
+            if name == "pystray":
+                raise RuntimeError('Bad display name ""')
+            return None
+
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(sys, "meta_path", [_FailingFinder()] + sys.meta_path)
+    monkeypatch.setenv("KEYLAYOUTFIXER_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("KEYLAYOUTFIXER_DATA_DIR", str(tmp_path / "data"))
+    from keylayoutfixer.tray import run_tray
+
+    with pytest.raises(RuntimeError, match="cannot start here"):
+        run_tray()
