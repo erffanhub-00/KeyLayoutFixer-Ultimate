@@ -1,0 +1,84 @@
+# Release workflow for KeyLayoutFixer-Ultimate
+#
+# HOW TO INSTALL (Erfan, via the website):
+#   1. Go to the repo on github.com -> .github/workflows/ -> "Add file" -> "Create new file"
+#   2. Name it exactly: release.yml
+#   3. Paste this whole file, then "Commit changes" (directly to main is fine).
+# The GitHub App cannot push workflow files, so this file has to be added by hand.
+# After that, creating a tag like v1.0.0 automatically builds the Windows/macOS/Linux
+# binaries and attaches them to a draft GitHub Release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: klf-windows-x86_64.exe
+          - os: macos-latest
+            asset: klf-macos-arm64
+          - os: ubuntu-latest
+            asset: klf-linux-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[tray]
+          pip install pyinstaller
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Build standalone binary
+        run: pyinstaller --onefile --name klf --clean --noconfirm --collect-all pystray --collect-all pynput klf.py
+      - name: Rename binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/klf.exe "${{ matrix.asset }}"
+          else
+            cp dist/klf "${{ matrix.asset }}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+          cp dist/*.tar.gz dist/*.whl artifacts/
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/*
